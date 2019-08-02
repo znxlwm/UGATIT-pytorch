@@ -122,6 +122,9 @@ class UGATIT(object) :
         self.G_optim = torch.optim.Adam(itertools.chain(self.genA2B.parameters(), self.genB2A.parameters()), lr=self.lr, betas=(0.5, 0.999))
         self.D_optim = torch.optim.Adam(itertools.chain(self.disGA.parameters(), self.disGB.parameters(), self.disLA.parameters(), self.disLB.parameters()), lr=self.lr, betas=(0.5, 0.999))
 
+        """ Define Rho clipper to constraint the value of rho in AdaILN and ILN"""
+        self.Rho_clipper = RhoClipper(0, 1)
+
     def train(self):
         self.genA2B.train(), self.genB2A.train(), self.disGA.train(), self.disGB.train(), self.disLA.train(), self.disLB.train()
 
@@ -232,6 +235,10 @@ class UGATIT(object) :
             Generator_loss = G_loss_A + G_loss_B
             Generator_loss.backward()
             self.G_optim.step()
+
+            # clip parameter of AdaILN and ILN, applied after optimizer step
+            self.genA2B.apply(self.Rho_clipper)
+            self.genB2A.apply(self.Rho_clipper)
 
             print("[%5d/%5d] time: %4.4f d_loss: %.8f, g_loss: %.8f" % (step, self.iteration, time.time() - start_time, Discriminator_loss, Generator_loss))
             if step % self.print_freq == 0:
