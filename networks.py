@@ -43,10 +43,14 @@ class ResnetGenerator(nn.Module):
         # Gamma, Beta block
         if self.light:
             FC = [nn.Linear(ngf * mult, ngf * mult, bias=False),
-                  nn.Linear(ngf * mult, ngf * mult, bias=False)]
+                  nn.ReLU(True),
+                  nn.Linear(ngf * mult, ngf * mult, bias=False),
+                  nn.ReLU(True)]
         else:
             FC = [nn.Linear(img_size // mult * img_size // mult * ngf * mult, ngf * mult, bias=False),
-                  nn.Linear(ngf * mult, ngf * mult, bias=False)]
+                  nn.ReLU(True),
+                  nn.Linear(ngf * mult, ngf * mult, bias=False),
+                  nn.ReLU(True)]
         self.gamma = nn.Linear(ngf * mult, ngf * mult, bias=False)
         self.beta = nn.Linear(ngf * mult, ngf * mult, bias=False)
 
