@@ -18,6 +18,7 @@ def parse_args():
     parser.add_argument('--decay_flag', type=str2bool, default=True, help='The decay_flag')
 
     parser.add_argument('--lr', type=float, default=0.0001, help='The learning rate')
+    parser.add_argument('--weight_decay', type=float, default=0.0001, help='The weight decay')
     parser.add_argument('--adv_weight', type=int, default=1, help='Weight for GAN')
     parser.add_argument('--cycle_weight', type=int, default=10, help='Weight for Cycle')
     parser.add_argument('--identity_weight', type=int, default=10, help='Weight for Identity')
