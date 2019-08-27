@@ -151,7 +151,7 @@ class ResnetAdaILNBlock(nn.Module):
         out = self.conv2(out)
         out = self.norm2(out, gamma, beta)
 
-        return out
+        return out + x
 
 
 class adaILN(nn.Module):
