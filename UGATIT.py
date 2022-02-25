@@ -6,6 +6,9 @@ from networks import *
 from utils import *
 from glob import glob
 
+import shutil
+from tqdm import tqdm
+
 class UGATIT(object) :
     def __init__(self, args):
         self.light = args.light
@@ -150,16 +153,16 @@ class UGATIT(object) :
                 self.D_optim.param_groups[0]['lr'] -= (self.lr / (self.iteration // 2))
 
             try:
-                real_A, _ = trainA_iter.next()
+                real_A, _, _ = trainA_iter.next()
             except:
                 trainA_iter = iter(self.trainA_loader)
-                real_A, _ = trainA_iter.next()
+                real_A, _, _ = trainA_iter.next()
 
             try:
-                real_B, _ = trainB_iter.next()
+                real_B, _, _ = trainB_iter.next()
             except:
                 trainB_iter = iter(self.trainB_loader)
-                real_B, _ = trainB_iter.next()
+                real_B, _, _ = trainB_iter.next()
 
             real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
@@ -251,16 +254,16 @@ class UGATIT(object) :
                 self.genA2B.eval(), self.genB2A.eval(), self.disGA.eval(), self.disGB.eval(), self.disLA.eval(), self.disLB.eval()
                 for _ in range(train_sample_num):
                     try:
-                        real_A, _ = trainA_iter.next()
+                        real_A, _, _ = trainA_iter.next()
                     except:
                         trainA_iter = iter(self.trainA_loader)
-                        real_A, _ = trainA_iter.next()
+                        real_A, _, _ = trainA_iter.next()
 
                     try:
-                        real_B, _ = trainB_iter.next()
+                        real_B, _, _ = trainB_iter.next()
                     except:
                         trainB_iter = iter(self.trainB_loader)
-                        real_B, _ = trainB_iter.next()
+                        real_B, _, _ = trainB_iter.next()
                     real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
                     fake_A2B, _, fake_A2B_heatmap = self.genA2B(real_A)
@@ -290,16 +293,16 @@ class UGATIT(object) :
 
                 for _ in range(test_sample_num):
                     try:
-                        real_A, _ = testA_iter.next()
+                        real_A, _, _ = testA_iter.next()
                     except:
                         testA_iter = iter(self.testA_loader)
-                        real_A, _ = testA_iter.next()
+                        real_A, _, _ = testA_iter.next()
 
                     try:
-                        real_B, _ = testB_iter.next()
+                        real_B, _, _ = testB_iter.next()
                     except:
                         testB_iter = iter(self.testB_loader)
-                        real_B, _ = testB_iter.next()
+                        real_B, _, _ = testB_iter.next()
                     real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
                     fake_A2B, _, fake_A2B_heatmap = self.genA2B(real_A)
@@ -354,8 +357,8 @@ class UGATIT(object) :
         params['disLB'] = self.disLB.state_dict()
         torch.save(params, os.path.join(dir, self.dataset + '_params_%07d.pt' % step))
 
-    def load(self, dir, step):
-        params = torch.load(os.path.join(dir, self.dataset + '_params_%07d.pt' % step))
+    def load(self, checkpoint):
+        params = torch.load(checkpoint)
         self.genA2B.load_state_dict(params['genA2B'])
         self.genB2A.load_state_dict(params['genB2A'])
         self.disGA.load_state_dict(params['disGA'])
@@ -366,16 +369,30 @@ class UGATIT(object) :
     def test(self):
         model_list = glob(os.path.join(self.result_dir, self.dataset, 'model', '*.pt'))
         if not len(model_list) == 0:
-            model_list.sort()
-            iter = int(model_list[-1].split('_')[-1].split('.')[0])
-            self.load(os.path.join(self.result_dir, self.dataset, 'model'), iter)
+            latest = [fname for fname in model_list if 'latest' in fname]
+            if latest:
+                checkpoint = latest[0]
+            else:
+                checkpoint = sorted(model_list)[-1]
+            print(f'loading {checkpoint}')
+            self.load(checkpoint)
             print(" [*] Load SUCCESS")
         else:
             print(" [*] Load FAILURE")
             return
 
         self.genA2B.eval(), self.genB2A.eval()
-        for n, (real_A, _) in enumerate(self.testA_loader):
+        A2B_folder = os.path.join(self.result_dir, self.dataset, 'test', 'A2B')
+        B2A_folder = os.path.join(self.result_dir, self.dataset, 'test', 'B2A')
+        if os.path.exists(A2B_folder):
+            shutil.rmtree(A2B_folder)
+        if os.path.exists(B2A_folder):
+            shutil.rmtree(B2A_folder)
+        os.makedirs(A2B_folder)
+        os.makedirs(B2A_folder)
+
+        for (real_A, _, path) in tqdm(self.testA_loader):
+            basename = os.path.basename(path[0])
             real_A = real_A.to(self.device)
 
             fake_A2B, _, fake_A2B_heatmap = self.genA2B(real_A)
@@ -392,9 +409,10 @@ class UGATIT(object) :
                                   cam(tensor2numpy(fake_A2B2A_heatmap[0]), self.img_size),
                                   RGB2BGR(tensor2numpy(denorm(fake_A2B2A[0])))), 0)
 
-            cv2.imwrite(os.path.join(self.result_dir, self.dataset, 'test', 'A2B_%d.png' % (n + 1)), A2B * 255.0)
+            cv2.imwrite(os.path.join(A2B_folder, basename), A2B * 255.0)
 
-        for n, (real_B, _) in enumerate(self.testB_loader):
+        for (real_B, _, path) in tqdm(self.testB_loader):
+            basename = os.path.basename(path[0])
             real_B = real_B.to(self.device)
 
             fake_B2A, _, fake_B2A_heatmap = self.genB2A(real_B)
@@ -411,4 +429,4 @@ class UGATIT(object) :
                                   cam(tensor2numpy(fake_B2A2B_heatmap[0]), self.img_size),
                                   RGB2BGR(tensor2numpy(denorm(fake_B2A2B[0])))), 0)
 
-            cv2.imwrite(os.path.join(self.result_dir, self.dataset, 'test', 'B2A_%d.png' % (n + 1)), B2A * 255.0)
+            cv2.imwrite(os.path.join(B2A_folder, basename), B2A * 255.0)
