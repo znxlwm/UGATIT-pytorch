@@ -5,6 +5,8 @@ from torch.utils.data import DataLoader
 from networks import *
 from utils import *
 from glob import glob
+from PIL import Image
+import cv2
 
 class UGATIT(object) :
     def __init__(self, args):
@@ -153,13 +155,13 @@ class UGATIT(object) :
                 real_A, _ = trainA_iter.next()
             except:
                 trainA_iter = iter(self.trainA_loader)
-                real_A, _ = trainA_iter.next()
+                real_A, _ = next(trainA_iter)
 
             try:
                 real_B, _ = trainB_iter.next()
             except:
                 trainB_iter = iter(self.trainB_loader)
-                real_B, _ = trainB_iter.next()
+                real_B, _ = next(trainB_iter)
 
             real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
@@ -254,13 +256,13 @@ class UGATIT(object) :
                         real_A, _ = trainA_iter.next()
                     except:
                         trainA_iter = iter(self.trainA_loader)
-                        real_A, _ = trainA_iter.next()
+                        real_A, _ = next(trainA_iter)
 
                     try:
                         real_B, _ = trainB_iter.next()
                     except:
                         trainB_iter = iter(self.trainB_loader)
-                        real_B, _ = trainB_iter.next()
+                        real_B, _ = next(trainB_iter)
                     real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
                     fake_A2B, _, fake_A2B_heatmap = self.genA2B(real_A)
@@ -293,13 +295,13 @@ class UGATIT(object) :
                         real_A, _ = testA_iter.next()
                     except:
                         testA_iter = iter(self.testA_loader)
-                        real_A, _ = testA_iter.next()
+                        real_A, _ = next(testA_iter)
 
                     try:
                         real_B, _ = testB_iter.next()
                     except:
                         testB_iter = iter(self.testB_loader)
-                        real_B, _ = testB_iter.next()
+                        real_B, _ = next(testB_iter)
                     real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
                     fake_A2B, _, fake_A2B_heatmap = self.genA2B(real_A)
@@ -363,8 +365,33 @@ class UGATIT(object) :
         self.disLA.load_state_dict(params['disLA'])
         self.disLB.load_state_dict(params['disLB'])
 
+    def build_model_for_demo(self):
+        """ Define Generator, Discriminator """
+        self.genA2B = ResnetGenerator(input_nc=3, output_nc=3, ngf=self.ch, n_blocks=self.n_res, img_size=self.img_size, light=self.light).to(self.device)
+        # self.genB2A = ResnetGenerator(input_nc=3, output_nc=3, ngf=self.ch, n_blocks=self.n_res, img_size=self.img_size, light=self.light).to(self.device)
+        # self.disGA = Discriminator(input_nc=3, ndf=self.ch, n_layers=7).to(self.device)
+        # self.disGB = Discriminator(input_nc=3, ndf=self.ch, n_layers=7).to(self.device)
+        # self.disLA = Discriminator(input_nc=3, ndf=self.ch, n_layers=5).to(self.device)
+        # self.disLB = Discriminator(input_nc=3, ndf=self.ch, n_layers=5).to(self.device)
+        params = torch.load('results/selfie2anime_params_latest.pt')
+        self.genA2B.load_state_dict(params['genA2B'])
+
+    def inference(self, d):   
+        #d = cv2.imread("/home/circulus/api-test/vision-test/face3.jpg")
+        h, w, _ = d.shape
+        d = cv2.resize(d, (256,256))
+        d = (d)/127.5 -1
+        d = np.transpose(d[np.newaxis,:,:,:], (0,3,1,2)).astype(np.float32)
+        d = torch.from_numpy(d).to(self.device)
+
+        fake_A2B, _, fake_A2B_heatmap = self.genA2B(d)
+        img = cv2.resize(RGB2BGR(tensor2numpy(denorm(fake_A2B[0])))*255.0, (w,h))
+        print(" [*] Load SUCCESS")
+        return img
+
     def test(self):
         model_list = glob(os.path.join(self.result_dir, self.dataset, 'model', '*.pt'))
+
         if not len(model_list) == 0:
             model_list.sort()
             iter = int(model_list[-1].split('_')[-1].split('.')[0])
