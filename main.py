@@ -68,16 +68,27 @@ def main():
     # open session
     gan = UGATIT(args)
 
-    # build graph
-    gan.build_model()
-
     if args.phase == 'train' :
+        # build graph
+        gan.build_model()
         gan.train()
         print(" [*] Training finished!")
 
     if args.phase == 'test' :
+        gan.build_model()
         gan.test()
         print(" [*] Test finished!")
+
+    if args.phase == 'demo':
+        gan.build_model_for_demo()
+        #cap = cv2.VideoCapture(0)
+        #_, img = cap.read()
+        img = cv2.imread("/home/circulus/project/Face-Attribute-Classification/img_align_celeba/000156.jpg")
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+        res = gan.inference(img)
+        cv2.imwrite("AAA.jpg", res)
+        print(" [*] Demo finished!")
 
 if __name__ == '__main__':
     main()
